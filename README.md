@@ -6,13 +6,6 @@ The smart password spraying and bruteforcing tool for Active Directory Domain Se
 
 **This project is actually in an alpha state. It has not been tested in many real life environments for now. Expect the unexpected...**
 
-This tool as well as its code was inspired/based on
-- [impacket](https://github.com/SecureAuthCorp/impacket)
-- [sprayhound](https://github.com/Hackndo/sprayhound)
-- [crackmapexec](https://github.com/byt3bl33d3r/CrackMapExec)
-- [kerbrute](https://github.com/ropnop/kerbrute) and [pykerbrute](https://github.com/3gstudent/pyKerbrute)
-- and probably indirectly many more
-
 ## Core features
 
 This tool can be used to bruteforce/spray Active Directory accounts credentials. The following attacks are supported, each attack has its own benefits:
@@ -74,23 +67,24 @@ This tool is built around multiple subparsers allocated in the following manner 
 Pull requests are welcome. Feel free to open an issue if you want to add other features.
 
 ## Credits & thanks
-All contributors behind the following projects:
+
+This tool as well as its code was inspired/based on:
 - [impacket](https://github.com/SecureAuthCorp/impacket)
 - [sprayhound](https://github.com/Hackndo/sprayhound)
 - [crackmapexec](https://github.com/byt3bl33d3r/CrackMapExec)
 - [kerbrute](https://github.com/ropnop/kerbrute) and [pykerbrute](https://github.com/3gstudent/pyKerbrute)
 - and probably indirectly many more
 
+We thank all contributors behind those projects.
+
 ## Memes
 
 And now, here is a collection of memes that perfectly frames this tool's spirit (feel free to contribute) 
 
-![](memes/001.png)
-
-![](memes/002.png)
-
-![](memes/003.png)
-
-![](memes/004.png)
-
-![](memes/005.png)
+<p align="center">
+  <img src="./memes/001.png">
+  <img src="./memes/002.png">
+  <img src="./memes/003.png">
+  <img src="./memes/004.png">
+  <img src="./memes/005.png">
+</p>
