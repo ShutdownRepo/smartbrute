@@ -1,28 +1,35 @@
-![](./docs/banner.png)
-
-The smart password spraying and bruteforcing tool for Active Directory Domain Services.
-
-This project is in alpha, not tested in many IRL environments for now.
-
-Work and code based or inspired from sprayhound, crackmapexec, kerbrute, pykerbrute, impacket, ...
-
-Main features
-What can this tool do:
-- fetch user list, bad password count for each account, global lockout policy (domain), granular lockout policies (password settings objects) and make sure to NOT lock any accounts. PSOs can be applied to groups, the tool lists all members from those groups (direct members or not) and creates a list users to test : lockout policy for that account.  
-- NTLM over SMB shows if user is local admin to the target or not
-- a valid auth will be used to query domain information using LDAP to find out if pwned accounts are part of sensitive groups
-- tool can interact with neo4j
-- bruteforce can be operated on NTLM over SMB, NTLM over LDAP, Kerberos (pre-authentication) over TCP, Kerberos (pre-authentication) over UDP
-- when attacking Kerberos, etype can be set to RC4, AES128 or AES256  
-- LDAP information can be recovered using LDAP
-- bruteforce can be stopped when a valid account is found
-- bruteforce can be operated line per line when supplying lists for both usernames and passwords/hashes
-- bruteforce can be operated with a user/password/hash or list of those
-- in smart mode, bruteforce can be skipped to only show fetched users and policies
+![](./assets/smartbrute.png)
 
 ## Description
 
-![](./assets/smartbrute.png)
+The smart password spraying and bruteforcing tool for Active Directory Domain Services.
+
+This project is released in alpha version. It has not been tested in many real life environments for now.
+
+This tool as well as its code base was inspired by sprayhound, crackmapexec, kerbrute, pykerbrute, impacket, ...
+
+## Core features
+
+What can this tool do:
+
+  - Fetch user list, bad password count for each account, global lockout policy (domain), granular lockout policies (password settings objects) and make sure to NOT lock any accounts. PSOs can be applied to groups, the tool lists all members from those groups (direct members or not) and creates a list users to test : lockout policy for that account.  
+  - NTLM over SMB shows if user is local admin to the target or not
+  - A valid authentication will be used to query domain information using LDAP to find out if owned accounts are part of sensitive groups
+  - It can interact with neo4j
+  - Bruteforce can be operated on :
+    + NTLM over SMB
+    + NTLM over LDAP
+    + Kerberos (pre-authentication) over TCP
+    + Kerberos (pre-authentication) over UDP
+  - When attacking Kerberos, etype can be set to :
+    + RC
+    + AES128
+    + AES256  
+  - LDAP information can be recovered using LDAP
+  - Bruteforce can be stopped when a valid account is found (with `--stop-on-success` option)
+  - Bruteforce can be operated line per line when supplying lists for both usernames and passwords/hashes
+  - Bruteforce can be operated with a user/password/hash or list of those
+  - In smart mode, bruteforce can be skipped to only show fetched users and password policies
 
 ## Usage
 
