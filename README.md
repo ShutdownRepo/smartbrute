@@ -6,7 +6,7 @@ The smart password spraying and bruteforcing tool for Active Directory Domain Se
 
 This project is released in alpha version. It has not been tested in many real life environments for now.
 
-This tool as well as its code base was inspired by sprayhound, crackmapexec, kerbrute, pykerbrute, impacket, ...
+This tool as well as its code base was inspired by [sprayhound](https://github.com/Hackndo/sprayhound), [crackmapexec](https://github.com/byt3bl33d3r/CrackMapExec), [kerbrute](https://github.com/ropnop/kerbrute), [pykerbrute](https://github.com/3gstudent/pyKerbrute), [impacket](https://github.com/SecureAuthCorp/impacket), ...
 
 ## Core features
 
