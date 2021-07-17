@@ -4,69 +4,93 @@
 
 The smart password spraying and bruteforcing tool for Active Directory Domain Services.
 
-This project is released in alpha version. It has not been tested in many real life environments for now.
+**This project is actually in an alpha state. It has not been tested in many real life environments for now. Expect the unexpected...**
 
-This tool as well as its code base was inspired by [sprayhound](https://github.com/Hackndo/sprayhound), [crackmapexec](https://github.com/byt3bl33d3r/CrackMapExec), [kerbrute](https://github.com/ropnop/kerbrute), [pykerbrute](https://github.com/3gstudent/pyKerbrute), [impacket](https://github.com/SecureAuthCorp/impacket), ...
+This tool as well as its code was inspired/based on
+- [impacket](https://github.com/SecureAuthCorp/impacket)
+- [sprayhound](https://github.com/Hackndo/sprayhound)
+- [crackmapexec](https://github.com/byt3bl33d3r/CrackMapExec)
+- [kerbrute](https://github.com/ropnop/kerbrute) and [pykerbrute](https://github.com/3gstudent/pyKerbrute)
+- and probably indirectly many more
 
 ## Core features
 
-What can this tool do:
+This tool can be used to bruteforce/spray Active Directory accounts credentials. The following attacks are supported, each attack has its own benefits:
+- NTLM over SMB bruteforce: when valid accounts are found, they will be tested for local administrative privileges.
+- NTLM over LDAP bruteforce
+- [Kerberos pre-authentication bruteforce](https://www.thehacker.recipes/active-directory-domain-services/movement/kerberos/pre-auth-bruteforce): this is the fastest and stealthiest way.
+    + The transport protocol can be chosen: UDP or TCP. UDP is the fastest but sometimes throws errors.
+    + The etype can be chosen: RC4, AES128, AES256. RC4 is the fastest but AES128 and AES256 are the stealthiest. 
 
-  - Fetch user list, bad password count for each account, global lockout policy (domain), granular lockout policies (password settings objects) and make sure to NOT lock any accounts. PSOs can be applied to groups, the tool lists all members from those groups (direct members or not) and creates a list users to test : lockout policy for that account.  
-  - NTLM over SMB shows if user is local admin to the target or not
-  - A valid authentication will be used to query domain information using LDAP to find out if owned accounts are part of sensitive groups
-  - It can interact with neo4j
-  - Bruteforce can be operated on :
-    + NTLM over SMB
-    + NTLM over LDAP
-    + Kerberos (pre-authentication) over TCP
-    + Kerberos (pre-authentication) over UDP
-  - When attacking Kerberos, etype can be set to :
-    + RC
-    + AES128
-    + AES256  
-  - LDAP information can be recovered using LDAP
-  - Bruteforce can be stopped when a valid account is found (with `--stop-on-success` option)
-  - Bruteforce can be operated line per line when supplying lists for both usernames and passwords/hashes
-  - Bruteforce can be operated with a user/password/hash or list of those
-  - In smart mode, bruteforce can be skipped to only show fetched users and password policies
+Passwords are not the only secrets that can be bruteforced with this tool.
+- When bruteforcing on NTLM: NT hashes can be attempted.
+- When bruteforcing on Kerberos: RC4 keys (i.e. NT hashes) can be attempted.
+
+When valid accounts are found:
+- they can be set as owned in a neo4j database (used by BloodHound)
+- when using neo4j, owned users that are on a path to Domain Admins will be highlighted
+
+This tool can be used in two different modes for different scenarios: `smart` or `brute`.
+
+### Smart mode
+
+This mode can be used to make sure NOT to lock any account when bruteforcing by:
+- Fetching the enabled users from Active Directory
+- Fetching bad password count for each user
+- Fetching lockout policies (global policy and granular policies set in Password Settings Objects). _Nota bene: PSOs can be applied to groups, the tool recursively lists all members from those groups and sets the appropriate lockout threshold for each user._
+- Bruteforcing users according to the information found (i.e. keep the bad password count below the lockout threshold. A safety margin can be set).
+  
+In order for the first LDAP enumeration to occur, this mode requires knowledge of a low-priv user credentials. The following authentications are supported:
+- **(NTLM)** Cleartext password
+- **(NTLM)** [Pass-the-hash](https://www.thehacker.recipes/active-directory-domain-services/movement/lm-and-ntlm/pass-the-hash)
+- **(Kerberos)** Cleartext password
+- **(Kerberos)** [Pass-the-key](https://www.thehacker.recipes/active-directory-domain-services/movement/kerberos/pass-the-key) / [Overpass-the-hash](https://www.thehacker.recipes/active-directory-domain-services/movement/kerberos/overpass-the-hash)
+- **(Kerberos)** [Pass-the-cache](https://www.thehacker.recipes/active-directory-domain-services/movement/kerberos/pass-the-cache) (type of [Pass-the-ticket](https://www.thehacker.recipes/active-directory-domain-services/movement/kerberos/pass-the-ticket))
+
+Before bruteforcing anything, this mode also recursively fetches the members of special groups (Administrators, Domain Admins, Entreprise Key Admins, and many more).
+When valid credentials are found, if the account is part of those members, it will be highlighted.
+
+In smart mode, bruteforce can be skipped to only show fetched users and password policies
+    
+### Brute mode
+
+The `brute` mode doesn't require prior knowledge of a low-priv user credentials but doesn't have safety features like the `smart` mode. This mode CAN effectively lock accounts.
+In this mode, a username (or list of usernames) has to be supplied.
+- Bruteforce can be operated line per line when supplying lists for both usernames and passwords/hashes
+- On the first successful bruteforced authentication, the tool will recursively fetch (using LDAP) the members of special groups (Administrators, Domain Admins, Entreprise Key Admins, and many more). When valid credentials are found, if the account is part of those members, it will be highlighted.
+- Bruteforce can be stopped when a valid account is found  
 
 ## Usage
 
-![](./assets/graph_help.png)
+This tool is designed to give its users the most control over what is happening. This leads to a complex (not complicated, there's a difference) usage.
+This tool is built around multiple subparsers allocated in the following manner (cf. following graph and picture).
 
-```
-$ smartbrute -h
-usage: smartbrute.py [-h] [-v] [-q] [--set-as-owned] [-nh NEO4J_HOST] [-nP NEO4J_PORT] [-nu NEO4J_USER] [-np NEO4J_PASSWORD] {brute,smart} ...
+![](./assets/cmd_help.png)
+![](assets/graph_help.png)
+![](./assets/usage.png)
 
-The smart password spraying and bruteforcing tool for Active Directory Domain Services.
-
-positional arguments:
-  {brute,smart}         this is a required argument and tells smartbrute in which mode to run. smart mode will enumerate users and policies and avoid locking out accounts given valid domain credentials. brute
-                        mode is dumb and only bruteforces.
-    brute               bruteforce mode
-    smart               smart mode
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -v, --verbose         verbosity level (-v for verbose, -vv for debug)
-  -q, --quiet           show no information at all
-
-neo4j option:
-  --set-as-owned        Set valid users as owned in neo4j
-  -nh NEO4J_HOST, --neo4j-host NEO4J_HOST
-                        neo4j database address (default: 127.0.0.1)
-  -nP NEO4J_PORT, --neo4j-port NEO4J_PORT
-                        neo4j database port (default:7687)
-  -nu NEO4J_USER, --neo4j-user NEO4J_USER
-                        neo4j username (default: neo4j)
-  -np NEO4J_PASSWORD, --neo4j-password NEO4J_PASSWORD
-                        neo4j password (default: neo4j)
-```
 ## Contributing
 
 Pull requests are welcome. Feel free to open an issue if you want to add other features.
 
-## References
-- https://www.thehacker.recipes/active-directory-domain-services/movement/credentials/bruteforcing/password-spraying
-- https://www.thehacker.recipes/active-directory-domain-services/movement/kerberos/pre-auth-bruteforce
+## Credits & thanks
+All contributors behind the following projects:
+- [impacket](https://github.com/SecureAuthCorp/impacket)
+- [sprayhound](https://github.com/Hackndo/sprayhound)
+- [crackmapexec](https://github.com/byt3bl33d3r/CrackMapExec)
+- [kerbrute](https://github.com/ropnop/kerbrute) and [pykerbrute](https://github.com/3gstudent/pyKerbrute)
+- and probably indirectly many more
+
+## Memes
+
+And now, here is a collection of memes that perfectly frames this tool's spirit (feel free to contribute) 
+
+![](memes/001.png)
+
+![](memes/002.png)
+
+![](memes/003.png)
+
+![](memes/004.png)
+
+![](memes/005.png)
