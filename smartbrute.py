@@ -723,8 +723,9 @@ class bruteforce(object):
                     user = self.get_attributes_from_object_dn(ldap_connection=ldap_connection, object_dn=user_dn, attributes=["sAMAccountName"])["sAMAccountName"].decode("utf-8")
                     admin_users.append(user)
             elif self.special_groups[group_dn]["group_type"] == "special":
-                user = self.get_attributes_from_object_dn(ldap_connection=ldap_connection, object_dn=user_dn, attributes=["sAMAccountName"])["sAMAccountName"].decode("utf-8")
-                special_users.append(user)
+                for user_dn in self.members_dn_from_group_dn(ldap_connection=ldap_connection, object_dn=group_dn):
+                    user = self.get_attributes_from_object_dn(ldap_connection=ldap_connection, object_dn=user_dn, attributes=["sAMAccountName"])["sAMAccountName"].decode("utf-8")
+                    special_users.append(user)
         self.admin_users = list(set(admin_users))
         self.special_users = list(set(special_users))
         logger.debug("Found %d special/admin users" % len(list(set(admin_users + special_users))))
@@ -1489,7 +1490,8 @@ yamete kudasai !!!"""
 
 
 def print_banner():
-    print("smartbrute.py version %s" % VERSION)
+    # print("smartbrute.py version %s" % VERSION)
+    print("")
 
 
 def get_options():
