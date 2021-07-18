@@ -962,7 +962,10 @@ class bruteforce(object):
                     self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.auth_domain)
                     self.domain_is_dumped = True
                     logger.success("Domain enumeration is over, starting attack")
+                    k, maxi = 1, len(self.users.keys())
                     for user_dn in self.users.keys():
+                        self.table.caption = "  [yellow3]User[/]: %d/%d (%3.1f%%) (%s)" % (k, maxi, round(k/maxi*100,1),user_dn.rstrip())
+                        k += 1
                         self.smart_try_user(user_dn)
             else:
                 logger.error("Error connecting, username/password might be invalid...")
@@ -998,22 +1001,48 @@ class bruteforce(object):
 
     def smart_try_user(self, user_dn):
         if self.options.bf_password is not None:
+            self.table.caption += "\n  [yellow3]Pass[/]: %d/%d (%3.1f%%)" % (1,1,100)
             self.smart_try_password_or_hash(user_dn=user_dn, password=self.options.bf_password, password_hash=None)
         elif self.options.bf_passwords_file is not None:
             if os.path.exists(self.options.bf_passwords_file):
                 with open(self.options.bf_passwords_file, "r") as bf_passwords_file:
-                    for password in bf_passwords_file.readlines():
+                    bf_passwords_file = bf_passwords_file.readlines()
+                    k, maxi = 1, len(bf_passwords_file)
+                    for password in bf_passwords_file:
+                        if "\n  [yellow3]Pass[/]: " not in self.table.caption:
+                            self.table.caption += "\n  [yellow3]Pass[/]: %d/%d (%3.1f%%)" % (k, maxi, round(k/maxi*100,1))
+                        else:
+                            self.table.caption = self.table.caption.split('\n  [yellow3]Pass[/]: ')[0] + "\n  [yellow3]Pass[/]: %d/%d (%3.1f%%)" % (k, maxi, round(k/maxi*100,1))
+                        k += 1
                         success = self.smart_try_password_or_hash(user_dn=user_dn, password=password.rstrip(), password_hash=None)
                         if success == True or success is None:
                             break
             else:
                 logger.error("File (%s) does not exist" % self.options.bf_passwords_file)
         elif self.options.bf_hash is not None:
+            self.table.caption += "\n  [yellow3]Hash[/]: %d/%d (%3.1f%%)" % (1,1,100)
             self.smart_try_password_or_hash(user_dn=user_dn, password=None, password_hash=self.options.bf_hash)
         elif self.options.bf_hashes_file is not None:
             if os.path.exists(self.options.bf_hashes_file):
                 with open(self.options.bf_hashes_file, "r") as bf_hashes_file:
-                    for password_hash in bf_hashes_file.readlines():
+                    bf_hashes_file = bf_hashes_file.readlines()
+                    # Keeping only NT hashes
+                    filtered_hashes, line_no = [], 1
+                    for h in bf_hashes_file:
+                        line_no += 1
+                        h = h.strip()
+                        if re.match('[0-9a-f]{32}',h.lower()):
+                            filtered_hashes.append(h.lower())
+                        else:
+                            logger.error("Skipping (%s) on line %d from hashes list as it does not match the NT format." % (h, line_no))
+                    # Starting bruteforce with the filtered_hashes
+                    k, maxi = 1, len(bf_hashes_file)
+                    for password_hash in bf_hashes_file:
+                        if "\n  [yellow3]Hash[/]: " not in self.table.caption:
+                            self.table.caption += "\n  [yellow3]Hash[/]: %d/%d (%3.1f%%)" % (k, maxi, round(k/maxi*100,1))
+                        else:
+                            self.table.caption = self.table.caption.split('\n  [yellow3]Hash[/]: ')[0] + "\n  [yellow3]Pass[/]: %d/%d (%3.1f%%)" % (k, maxi, round(k/maxi*100,1))
+                        k += 1
                         success = self.smart_try_password_or_hash(user_dn=user_dn, password=None, password_hash=password_hash.rstrip())
                         if success == True or success is None:
                             break
@@ -1021,6 +1050,7 @@ class bruteforce(object):
                 logger.error("File (%s) does not exist" % self.options.bf_passwords_file)
         elif self.options.user_as_password:
             user = self.users[user_dn]["sAMAccountName"]
+            self.table.caption += "\n  [yellow3]Pass[/]: %d/%d (%3.1f%%)" % (1,1,100)
             self.smart_try_password_or_hash(user_dn=user_dn, password=user, password_hash=None)
         else:
             logger.warning("There is nothing to be done here, no password/hash (or list of) supplied.")
@@ -1075,6 +1105,7 @@ class bruteforce(object):
 
     def bruteforce_attack(self):
         if self.options.bf_user is not None:
+            self.table.caption = "  [yellow3]User[/]: %d/%d (%3.1f%%) (%s)" % (1,1,100,self.options.bf_user.rstrip())
             self.bruteforce_try_user(self.options.bf_user)
         elif self.options.line_per_line and self.options.bf_users_file is not None and (self.options.bf_passwords_file is not None or self.options.bf_hashes_file is not None):
             users = []
@@ -1093,6 +1124,7 @@ class bruteforce(object):
                     exit(0)
                 else:
                     for i in range(len(users)):
+                        self.table.caption = "  [yellow3]User[/]: %d/%d (%3.1f%%) (%s)" % (i, maxi, round(i/maxi*100,1), users[i].rstrip())
                         success = self.bruteforce_try_password_or_hash(user=users[i], password=passwords[i], password_hash=None)
                         if success == True and self.options.stop_on_success == True:
                             logger.debug("Stopping on first successful auth")
@@ -1119,7 +1151,9 @@ class bruteforce(object):
                     logger.error("Mismatch between the number of users (%d) and the number of password hashes (%d), can't try line per line, exiting..." % (len(users), len(password_hashes)))
                     exit(0)
                 else:
+                    maxi = len(users)
                     for i in range(len(users)):
+                        self.table.caption = "  [yellow3]User[/]: %d/%d (%3.1f%%) (%s)" % (i, maxi, round(i/maxi*100,1), users[i].rstrip())
                         success = self.bruteforce_try_password_or_hash(user=users[i], password=None, password_hash=password_hashes[i])
                         if success == True and self.options.stop_on_success == True:
                             logger.debug("Stopping on first successful auth")
@@ -1146,6 +1180,7 @@ class bruteforce(object):
     def bruteforce_try_user(self, user):
         # Bruteforce with passwords
         if self.options.bf_password is not None:
+            self.table.caption += "\n  [yellow3]Pass[/]: %d/%d (%3.1f%%)" % (1,1,100)
             return self.bruteforce_try_password_or_hash(user=user, password=self.options.bf_password, password_hash=None)
         elif self.options.bf_passwords_file is not None:
             if os.path.exists(self.options.bf_passwords_file):
@@ -1166,6 +1201,7 @@ class bruteforce(object):
                 logger.error("File (%s) does not exist" % self.options.bf_passwords_file)
         # Bruteforce with hashes
         elif self.options.bf_hash is not None:
+            self.table.caption += "\n  [yellow3]Hash[/]: %d/%d (%3.1f%%)" % (1,1,100)
             return self.bruteforce_try_password_or_hash(user=user, password=None, password_hash=self.options.bf_hash)
         elif self.options.bf_hashes_file is not None:
             if os.path.exists(self.options.bf_hashes_file):
@@ -1356,7 +1392,7 @@ class Neo4jConnection:
             with session.begin_transaction() as tx:
                 query = """
                     MATCH (n:User {{name:\"{}\"}}),(m:Group),p=shortestPath((n)-[r:{}*1..]->(m))
-                    WHERE m.objectsid ENDS WITH "-512" OR m.objectid ENDS WITH "-512" 
+                    WHERE m.objectsid ENDS WITH "-512" OR m.objectid ENDS WITH "-512"
                     RETURN COUNT(p) AS pathNb
                     """.format(user, '|'.join(effective_edges))
 
