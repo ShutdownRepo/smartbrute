@@ -39,12 +39,16 @@ from rich.columns import Columns
 from rich import box
 from rich.table import Table
 from rich.live import Live
-from sprayhound.modules.neo4jconnection import Neo4jConnection
-from neo4j.exceptions import AuthError as Neo4jAuthError
+try:
+    from neo4j.v1 import GraphDatabase
+except ImportError:
+    from neo4j import GraphDatabase
+from neo4j.exceptions import AuthError, ServiceUnavailable
 
 # sprahound's global vars
 ERROR_SUCCESS                       = (0, "")
 ERROR_NEO4J_NON_EXISTENT_NODE       = (102, "Node does not exist in database")
+ERROR_NO_PATH                       = (103, "No admin path from this node")
 
 smb_error_status = {
     "STATUS_ACCOUNT_DISABLED":"disabled",
@@ -570,7 +574,7 @@ class NTLM(object):
             exit(0)
         try:
             logger.debug("Connecting to smb://%s on port 445" % target)
-            smb_connection = SMBConnection(target, target, None, "445")
+            smb_connection = SMBConnection(target, target, None, "445", timeout=15)
         except socket.error:
             return False, ""
         except Exception as e:
@@ -589,7 +593,7 @@ class NTLM(object):
         except SessionError as e:
             error, description = e.getErrorString()
             if error in smb_error_status.keys():
-                return False, error
+                return None, error
             else:
                 return False, ""
 
@@ -888,7 +892,6 @@ class bruteforce(object):
         else:
             # below occurs when testing with the smart mode on so that accounts don't get locked out
             if user_dn is not None:
-                # todo : I need to check this still works after latest refactoring
                 self.users[user_dn]["badPwdCount"] += 1
             # we still want to print the disabled accounts
             style = "magenta"
@@ -1047,22 +1050,24 @@ class bruteforce(object):
                     # LDAP authentication doesn't throw errors indicating is the user is disabled or something...
                     details = ""
                 self.handle_auth_results(domain=domain, user=user, user_dn=user_dn, password=password, password_hash=password_hash, auth=auth, details=details)
-                if auth:
-                    return True
-                else:
-                    return False
+                # I'm returning auth instead of True or False because there are scenarios where auth==None, example: when an SMB auth is ok but throws an error on the account (disabled for instance)
+                return auth
             elif self.options.bruteforced_protocol == "kerberos":
                 if self.options.kdc_ip is not None:
                     target = self.options.kdc_ip
                 else:
                     target = self.options.auth_domain
                 if user not in self.kerberos.disabled_account and user not in self.kerberos.principal_unknown:
-                    auth, details = self.kerberos.pre_authentication(target=target, domain=self.options.auth_domain, user=user, password=password, rc4_key=password_hash, etype=self.options.etype, tproto=self.options.transport_protocol)
-                    self.handle_auth_results(domain=self.options.auth_domain, user=user, user_dn=user_dn, password=password, password_hash=password_hash, auth=auth, details=details)
-                    if auth:
-                        return True
-                    else:
-                        return False
+                    try:
+                        auth, details = self.kerberos.pre_authentication(target=target, domain=self.options.auth_domain, user=user, password=password, rc4_key=password_hash, etype=self.options.etype, tproto=self.options.transport_protocol)
+                        self.handle_auth_results(domain=self.options.auth_domain, user=user, user_dn=user_dn, password=password, password_hash=password_hash, auth=auth, details=details)
+                        if auth:
+                            return True
+                        else:
+                            return False
+                    except Exception as pre_auth_error:
+                        logger.error(pre_auth_error)
+                        return None
         else:
             logger.debug("Maximum attempts reached for user %s, reduce --lockout-threshold to bypass" % self.users[user_dn]["sAMAccountName"])
 
@@ -1233,6 +1238,8 @@ class bruteforce(object):
                             self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.domain)
                             self.domain_is_dumped = True
                             logger.verbose("Domain enumeration is over, resuming attack")
+                self.handle_auth_results(domain=domain, user=user, user_dn=None, password=password, password_hash=password_hash, auth=auth, details=details)
+                return auth
             elif self.options.application_protocol == "ldap":
                 auth = self.ntlm.LDAP_authentication(target=target, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
                 # LDAP authentication doesn't throw errors indicating is the user is disabled or something...
@@ -1247,34 +1254,145 @@ class bruteforce(object):
                             self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.domain)
                             self.domain_is_dumped = True
                             logger.verbose("Domain enumeration is over, resuming attack")
-            self.handle_auth_results(domain=domain, user=user, user_dn=None, password=password, password_hash=password_hash, auth=auth, details=details)
-            if auth:
-                return True
-            else:
-                return False
+                self.handle_auth_results(domain=domain, user=user, user_dn=None, password=password, password_hash=password_hash, auth=auth, details=details)
+                if auth:
+                    return True
+                else:
+                    return False
         elif self.options.bruteforced_protocol == "kerberos":
             if self.options.kdc_ip is not None:
                 target = self.options.kdc_ip
             else:
                 target = self.options.domain
             if user not in self.kerberos.disabled_account and user not in self.kerberos.principal_unknown:
-                auth, details = self.kerberos.pre_authentication(target=target, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, etype=self.options.etype, tproto=self.options.transport_protocol)
-                if auth and not self.domain_is_dumped and not self.options.no_enumeration:
-                    logger.verbose("First successful auth! Starting domain dump to find privileged users")
-                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=None, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None)
-                    if ldap_connection:
-                        self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.domain)
-                        self.domain_is_dumped = True
-                        logger.verbose("Domain enumeration is over, resuming attack")
-                self.handle_auth_results(domain=self.options.domain, user=user, user_dn=None, password=password, password_hash=password_hash, auth=auth, details=details)
-                if user in self.kerberos.disabled_account or user in self.kerberos.principal_unknown:
-                    # returning None, because then, we don't want to continue bruteforce on an account that we know to be disabled or unknown
-                    return None
-                else:
-                    if auth:
-                        return True
+                try:
+                    auth, details = self.kerberos.pre_authentication(target=target, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, etype=self.options.etype, tproto=self.options.transport_protocol)
+                    if auth and not self.domain_is_dumped and not self.options.no_enumeration:
+                        logger.verbose("First successful auth! Starting domain dump to find privileged users")
+                        ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=None, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None)
+                        if ldap_connection:
+                            self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.domain)
+                            self.domain_is_dumped = True
+                            logger.verbose("Domain enumeration is over, resuming attack")
+                    self.handle_auth_results(domain=self.options.domain, user=user, user_dn=None, password=password, password_hash=password_hash, auth=auth, details=details)
+                    if user in self.kerberos.disabled_account or user in self.kerberos.principal_unknown:
+                        # returning None, because then, we don't want to continue bruteforce on an account that we know to be disabled or unknown
+                        return None
                     else:
-                        return False
+                        if auth:
+                            return True
+                        else:
+                            return False
+                except Exception as pre_auth_error:
+                    logger.error(pre_auth_error)
+                    return None
+
+
+class Neo4jConnection:
+    class Options:
+        def __init__(self, host, user, password, port, log, edge_blacklist=None):
+            self.user = user
+            self.password = password
+            self.host = host
+            self.port = port
+            self.log = log
+            self.edge_blacklist = edge_blacklist if edge_blacklist is not None else []
+
+    def __init__(self, options):
+        self.user = options.user
+        self.password = options.password
+        self.log = options.log
+        self.edge_blacklist = options.edge_blacklist
+        self._uri = "bolt://{}:{}".format(options.host, options.port)
+        try:
+            self._get_driver()
+        except Exception as e:
+            self.log.error("Failed to connect to Neo4J database")
+            raise
+
+    def set_as_owned(self, username, domain):
+        user = self._format_username(username, domain)
+        query = "MATCH (u:User {{name:\"{}\"}}) SET u.owned=True RETURN u.name AS name".format(user)
+        self.log.debug("Query : {}".format(query))
+        result = self._run_query(query)
+        if len(result) > 0:
+            return ERROR_SUCCESS
+        else:
+            return ERROR_NEO4J_NON_EXISTENT_NODE
+
+    def bloodhound_analysis(self, username, domain):
+
+        edges = [
+            "MemberOf",
+            "HasSession",
+            "AdminTo",
+            "AllExtendedRights",
+            "AddMember",
+            "ForceChangePassword",
+            "GenericAll",
+            "GenericWrite",
+            "Owns",
+            "WriteDacl",
+            "WriteOwner",
+            "CanRDP",
+            "ExecuteDCOM",
+            "AllowedToDelegate",
+            "ReadLAPSPassword",
+            "Contains",
+            "GpLink",
+            "AddAllowedToAct",
+            "AllowedToAct",
+            "SQLAdmin"
+        ]
+        # Remove blacklisted edges
+        without_edges = [e.lower() for e in self.edge_blacklist]
+        effective_edges = [edge for edge in edges if edge.lower() not in without_edges]
+
+        user = self._format_username(username, domain)
+        value = None
+
+        with self._driver.session() as session:
+            with session.begin_transaction() as tx:
+                query = """
+                    MATCH (n:User {{name:\"{}\"}}),(m:Group),p=shortestPath((n)-[r:{}*1..]->(m))
+                    WHERE m.objectsid ENDS WITH "-512" OR m.objectid ENDS WITH "-512" 
+                    RETURN COUNT(p) AS pathNb
+                    """.format(user, '|'.join(effective_edges))
+
+                self.log.debug("Query : {}".format(query))
+                value = tx.run(query).value()
+        return ERROR_SUCCESS if value[0] > 0 else ERROR_NO_PATH
+
+    def clean(self):
+        if self._driver is not None:
+            self._driver.close()
+        return ERROR_SUCCESS
+
+    def _run_query(self, query):
+        value = None
+        with self._driver.session() as session:
+            with session.begin_transaction() as tx:
+                res = tx.run(query)
+                value = res.value()
+        return value
+
+    def _get_driver(self):
+        try:
+            self._driver = GraphDatabase.driver(self._uri, auth=(self.user, self.password))
+            return ERROR_SUCCESS
+        except AuthError as e:
+            self.log.error("Neo4j invalid credentials {}:{}".format(self.user, self.password))
+            raise
+        except ServiceUnavailable as e:
+            self.log.error("Neo4j database unavailable at {}".format(self._uri))
+            raise
+        except Exception as e:
+            self.log.error("An unexpected error occurred while connecting to Neo4J database {} ({}:{})".format(self._uri, self.user, self.password))
+            raise
+
+    @staticmethod
+    def _format_username(user, domain):
+        return (user + "@" + domain).upper()
 
 
 class Logger(object):
@@ -1604,7 +1722,7 @@ if __name__ == "__main__":
             neo4j._get_driver()
             try:
                 neo4j._run_query("MATCH p=(n) RETURN p")
-            except Neo4jAuthError as e:
+            except AuthError as e:
                 logger.error("Error when connecting to the neo4j database, check the credentials")
                 exit(0)
             except Exception as e:
