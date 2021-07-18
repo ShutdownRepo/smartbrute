@@ -7,6 +7,7 @@
 
 import argparse
 import os
+import re
 import socket
 import random
 import ssl
@@ -1073,7 +1074,7 @@ class bruteforce(object):
             users = []
             if os.path.exists(self.options.bf_users_file):
                 with open(self.options.bf_users_file, "r") as bf_users_file:
-                    for user in bf_users_file.readlines():
+                    for user in bf_users_file:
                         users.append(user.rstrip())
             if self.options.bf_passwords_file is not None:
                 passwords = []
@@ -1097,6 +1098,17 @@ class bruteforce(object):
                     with open(self.options.bf_hashes_file, "r") as bf_hashes_file:
                         for password_hash in bf_hashes_file.readlines():
                             password_hashes.append(password_hash.rstrip())
+                # Keeping only NT hashes
+                filtered_hashes, line_no = [], 1
+                for h in password_hashes:
+                    line_no += 1
+                    h = h.strip()
+                    if re.match('[0-9a-f]{32}',h.lower()):
+                        filtered_hashes.append(h.lower())
+                    else:
+                        logger.error("Skipping (%s) on line %d from hashes list as it does not match the NT format." % (h, line_no))
+                password_hashes = filtered_hashes
+                # Starting bruteforce line by line
                 if len(users) != len(password_hashes):
                     logger.error("Mismatch between the number of users (%d) and the number of password hashes (%d), can't try line per line, exiting..." % (len(users), len(password_hashes)))
                     exit(0)
@@ -1111,7 +1123,11 @@ class bruteforce(object):
         elif self.options.bf_users_file is not None:
             if os.path.exists(self.options.bf_users_file):
                 with open(self.options.bf_users_file, "r") as bf_users_file:
-                    for user in bf_users_file.readlines():
+                    bf_users_file = bf_users_file.readlines()
+                    k, maxi = 1, len(bf_users_file)
+                    for user in bf_users_file:
+                        self.table.caption = "  [yellow3]User[/]: %d/%d (%3.1f%%) (%s)" % (k, maxi, round(k/maxi*100,1),user.rstrip())
+                        k += 1
                         success = self.bruteforce_try_user(user.rstrip())
                         if success == True and self.options.stop_on_success == True:
                             logger.debug("Stopping on first successful auth")
@@ -1122,24 +1138,50 @@ class bruteforce(object):
             logger.error("No user (or list of users) was supplied, there is nothing to bruteforce")
 
     def bruteforce_try_user(self, user):
+        # Bruteforce with passwords
         if self.options.bf_password is not None:
             return self.bruteforce_try_password_or_hash(user=user, password=self.options.bf_password, password_hash=None)
         elif self.options.bf_passwords_file is not None:
             if os.path.exists(self.options.bf_passwords_file):
                 with open(self.options.bf_passwords_file, "r") as bf_passwords_file:
-                    for password in bf_passwords_file.readlines():
+                    bf_passwords_file = bf_passwords_file.readlines()
+                    k, maxi = 1, len(bf_passwords_file)
+                    for password in bf_passwords_file:
+                        if "\n  [yellow3]Pass[/]: " not in self.table.caption:
+                            self.table.caption += "\n  [yellow3]Pass[/]: %d/%d (%3.1f%%)" % (k, maxi, round(k/maxi*100,1))
+                        else:
+                            self.table.caption = self.table.caption.split('\n  [yellow3]Pass[/]: ')[0] + "\n  [yellow3]Pass[/]: %d/%d (%3.1f%%)" % (k, maxi, round(k/maxi*100,1))
+                        k += 1
                         success = self.bruteforce_try_password_or_hash(user=user, password=password.rstrip(), password_hash=None)
                         if success == True or success is None:
                             return success
                         time.sleep(self.options.delay)
             else:
                 logger.error("File (%s) does not exist" % self.options.bf_passwords_file)
+        # Bruteforce with hashes
         elif self.options.bf_hash is not None:
             return self.bruteforce_try_password_or_hash(user=user, password=None, password_hash=self.options.bf_hash)
         elif self.options.bf_hashes_file is not None:
             if os.path.exists(self.options.bf_hashes_file):
                 with open(self.options.bf_hashes_file, "r") as bf_hashes_file:
-                    for password_hash in bf_hashes_file.readlines():
+                    bf_hashes_file = bf_hashes_file.readlines()
+                    # Keeping only NT hashes
+                    filtered_hashes, line_no = [], 1
+                    for h in bf_hashes_file:
+                        line_no += 1
+                        h = h.strip()
+                        if re.match('[0-9a-f]{32}',h.lower()):
+                            filtered_hashes.append(h.lower())
+                        else:
+                            logger.error("Skipping (%s) on line %d from hashes list as it does not match the NT format." % (h, line_no))
+                    # Starting bruteforce with the filtered_hashes
+                    k, maxi = 1, len(filtered_hashes)
+                    for password_hash in filtered_hashes:
+                        if "\n  [yellow3]Hash[/]: " not in self.table.caption:
+                            self.table.caption += "\n  [yellow3]Hash[/]: %d/%d (%3.1f%%)" % (k, maxi, round(k/maxi*100,1))
+                        else:
+                            self.table.caption = self.table.caption.split('\n  [yellow3]Hash[/]: ')[0] + "\n  [yellow3]Hash[/]: %d/%d (%3.1f%%)" % (k, maxi, round(k/maxi*100,1))
+                        k += 1
                         success = self.bruteforce_try_password_or_hash(user=user, password=None, password_hash=password_hash.rstrip())
                         if success == True or success is None:
                             return success
@@ -1235,7 +1277,7 @@ class bruteforce(object):
                         return False
 
 
-class Logger:
+class Logger(object):
     def __init__(self, verbosity=0, quiet=False):
         self.verbosity = verbosity
         self.quiet = quiet
@@ -1488,14 +1530,17 @@ def get_options():
         kerberos_parser.print_help()
         exit(0)
 
+    if options.bruteforced_protocol == "kerberos":
+        if options.bf_hash is not None or options.bf_hashes_file is not None and options.etype != "rc4":
+            print("error: -e/--etype was set to aes128 or aes256 but a RC4 key (or set of) was supplied with -bh/-bH, this doesn't make sense. Resuming the bruteforce with RC4 etype.")
+            kerberos_parser.print_help()
+            exit(0)
 
     return options
 
 
 def main(options, logger, console, neo4j):
 
-    if options.bf_hash is not None or options.bf_hashes_file is not None and options.etype != "rc4":
-        logger.warning("-e/--etype was set to aes128 or aes256 but a RC4 key (or set of) was supplied with -bh/-bH, this doesn't make sense. Resuming the bruteforce with RC4 etype.")
     # if options.running_mode == "smart" and (options.bruteforced_protocol == "ntlm" or options.bruteforced_protocol == "kerberos") and options.domain is None:
     #     logger.verbose("No bruteforced domain was set, using the same as the one used for authentication")
     #     options.domain = options.auth_domain
@@ -1521,7 +1566,15 @@ def main(options, logger, console, neo4j):
             logger.error("No password (or list of passwords, or hashes) was supplied, there is nothing to be done")
             exit(0)
 
-    table = Table(show_header=True, header_style="bold blue", border_style="grey35", box=box.SQUARE)
+    table = Table(
+        show_header=True,
+        header_style="bold blue",
+        border_style="grey35",
+        caption_style="",
+        caption_justify="left",
+        box=box.SQUARE,
+        width=60
+    )
     with Live(Columns((table,), expand=True), console=console, refresh_per_second=10, vertical_overflow="ellipsis"):
         table.add_column("domain")
         table.add_column("user")
