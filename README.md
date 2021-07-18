@@ -1,4 +1,4 @@
-![](./assets/smartbrute.png)
+<!--![](./assets/smartbrute.png)-->
 
 ## Description
 
@@ -51,7 +51,9 @@ The `brute` mode doesn't require prior knowledge of a low-priv user credentials 
 In this mode, a username (or list of usernames) has to be supplied.
 - Bruteforce can be operated line per line when supplying lists for both usernames and passwords/hashes
 - On the first successful bruteforced authentication, the tool will recursively fetch (using LDAP) the members of special groups (Administrators, Domain Admins, Entreprise Key Admins, and many more). When valid credentials are found, if the account is part of those members, it will be highlighted.
-- Bruteforce can be stopped when a valid account is found  
+- Bruteforce can be stopped when a valid account is found 
+
+![](./assets/example_brute.gif)
 
 ## Usage
 
