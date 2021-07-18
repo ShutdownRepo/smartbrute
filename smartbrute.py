@@ -1690,9 +1690,9 @@ def main(options, logger, console, neo4j):
         border_style="grey35",
         caption_style="",
         caption_justify="left",
-        box=box.SQUARE,
-        width=60
+        box=box.SQUARE
     )
+
     with Live(Columns((table,), expand=True), console=console, refresh_per_second=10, vertical_overflow="ellipsis"):
         table.add_column("domain")
         table.add_column("user")
@@ -1702,7 +1702,6 @@ def main(options, logger, console, neo4j):
         if secret is not None:
             table.add_column(secret)
             table.add_column("details")
-
         bf = bruteforce(options, table, neo4j)
         if options.running_mode == "brute":
             bf.bruteforce_attack()
