@@ -964,7 +964,7 @@ class bruteforce(object):
                     logger.success("Domain enumeration is over, starting attack")
                     k, maxi = 1, len(self.users.keys())
                     for user_dn in self.users.keys():
-                        self.table.caption = "  [yellow3]User[/]: %d/%d (%3.1f%%) (%s)" % (k, maxi, round(k/maxi*100,1),user_dn.rstrip())
+                        self.table.caption = "  [yellow3]User[/]: %d/%d (%3.1f%%) (%s)" % (k, maxi, round(k/maxi*100,1), self.users[user_dn]["sAMAccountName"])
                         k += 1
                         self.smart_try_user(user_dn)
             else:
@@ -1041,7 +1041,7 @@ class bruteforce(object):
                         if "\n  [yellow3]Hash[/]: " not in self.table.caption:
                             self.table.caption += "\n  [yellow3]Hash[/]: %d/%d (%3.1f%%)" % (k, maxi, round(k/maxi*100,1))
                         else:
-                            self.table.caption = self.table.caption.split('\n  [yellow3]Hash[/]: ')[0] + "\n  [yellow3]Pass[/]: %d/%d (%3.1f%%)" % (k, maxi, round(k/maxi*100,1))
+                            self.table.caption = self.table.caption.split('\n  [yellow3]Hash[/]: ')[0] + "\n  [yellow3]Hash[/]: %d/%d (%3.1f%%)" % (k, maxi, round(k/maxi*100,1))
                         k += 1
                         success = self.smart_try_password_or_hash(user_dn=user_dn, password=None, password_hash=password_hash.rstrip())
                         if success == True or success is None:
@@ -1745,6 +1745,7 @@ def main(options, logger, console, neo4j):
             bf.bruteforce_attack()
         elif options.running_mode == "smart":
             bf.smart_attack()
+        table.caption = None
 
 
 if __name__ == "__main__":
@@ -1766,6 +1767,7 @@ if __name__ == "__main__":
                 logger.error("Other error occured: %s" % e)
                 exit(0)
         main(options, logger, console, neo4j)
+        print()
     except KeyboardInterrupt:
         logger.info("Terminating script...")
         raise SystemExit
