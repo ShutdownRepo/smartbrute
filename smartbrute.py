@@ -753,7 +753,8 @@ class bruteforce(object):
             domain_dn = ",".join(["DC=" + part for part in domain.split(".")])
 
         # any user that is not disabled
-        search_filters = "(&(objectCategory=User)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+        # search_filters = "(&(objectCategory=User)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+        search_filters = "(objectCategory=User)"
         # we want username and attempts left for each account
         attributes = ["samAccountName", "badPwdCount", "distinguishedName"]
 
@@ -1730,12 +1731,12 @@ def main(options, logger, console, neo4j):
     else:
         if options.user_as_password:
             secret = "password"
-        elif options.bruteforced_protocol == "ntlm":
-            logger.error("No password (or list of passwords, or hashes) was supplied, there is nothing to be done")
-            exit(0)
-        elif options.bruteforced_protocol == "kerberos":
-            logger.error("No password (or list of passwords, or hashes) was supplied, there is nothing to be done")
-            exit(0)
+        # elif options.bruteforced_protocol == "ntlm":
+        #     logger.error("No password (or list of passwords, or hashes) was supplied, there is nothing to be done")
+        #     exit(0)
+        # elif options.bruteforced_protocol == "kerberos":
+        #     logger.error("No password (or list of passwords, or hashes) was supplied, there is nothing to be done")
+        #     exit(0)
 
     table = Table(
         show_header=True,
