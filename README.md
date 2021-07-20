@@ -43,7 +43,9 @@ In order for the first LDAP enumeration to occur, this mode requires knowledge o
 Before bruteforcing anything, this mode also recursively fetches the members of special groups (Administrators, Domain Admins, Entreprise Key Admins, and many more).
 When valid credentials are found, if the account is part of those members, it will be highlighted.
 
-In smart mode, bruteforce can be skipped to only show fetched users and password policies
+In smart mode, bruteforce can also be skipped to only show fetched users or password policies.
+
+![](./assets/example_smart.gif)
     
 ### Brute mode
 
