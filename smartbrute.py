@@ -1589,7 +1589,7 @@ def get_options():
 
     # defining the smart mode arguments
     smart_mode = argparse.ArgumentParser(add_help=False)
-    smart_mode.add_argument("-t", "--lockout-threshold", dest="lockout_threshold", action="store", type=int, default=3, required=False, help="number of attempts to leave the user (0 could lockout accounts)")
+    smart_mode.add_argument("-t", "--lockout-threshold", dest="lockout_threshold", action="store", type=int, default=3, required=False, help="number of attempts to leave the user (0 could lockout accounts) (default: 3)")
     smart_mode.add_argument("--delay", dest="delay", action="store", type=float, default=0, help="number of seconds to wait before each attempt (default: 0)")
     smartbruteforced_action = smart_mode.add_mutually_exclusive_group(required=True)
     smartbruteforced_action.add_argument("--users", dest="enum_users", action="store_true", default=False, help="only show users list")
@@ -1617,10 +1617,10 @@ def get_options():
     ntlm_auth = argparse.ArgumentParser(add_help=False)
     ntlm_auth.add_argument("--dc-ip", dest="auth_dc_ip", metavar="DC_IP", action="store", help="domain controller to authenticate to")
     ntlm_auth.add_argument("-d", "--domain", dest="auth_domain", metavar="DOMAIN", action="store", required=True, help="domain to authenticate to")
-    ntlm_auth.add_argument("-u", "--user", dest="auth_user", metavar="USER", action="store", required=True, help="user to authenticate with")
+    ntlm_auth.add_argument("-u", "--auth-user", dest="auth_user", metavar="USER", action="store", required=True, help="user to authenticate with")
     ntlm_secrets = ntlm_auth.add_mutually_exclusive_group(required=True)
-    ntlm_secrets.add_argument("-p", "--password", dest="auth_password", metavar="PASSWORD", action="store", help="password to authenticate with")
-    ntlm_secrets.add_argument("-H", "--hashes", dest="auth_hashes", action="store", metavar="[LMHASH:]NTHASH", help="hashes to authenticate with")
+    ntlm_secrets.add_argument("-p", "--auth-password", dest="auth_password", metavar="PASSWORD", action="store", help="password to authenticate with")
+    ntlm_secrets.add_argument("-H", "--auth-hashes", dest="auth_hashes", action="store", metavar="[LMHASH:]NTHASH", help="hashes to authenticate with")
 
     # adding the NTLM and Kerberos target protocol for smart mode attack as subparsers to the NTLM auth protocol
     ntlm_mode_protocols_subparser = ntlm_auth.add_subparsers(help="this tells what authentication protocol smartbrute has to use when bruteforcing. When choosing kerberos, smartbrute will operate a pre-authentication bruteforce", dest="bruteforced_protocol")
