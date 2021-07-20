@@ -950,7 +950,7 @@ class bruteforce(object):
                     self.get_users(ldap_connection=ldap_connection, domain=self.options.auth_domain)
                     logger.success("Global lockout threshold is: %d" % self.global_lockout_threshold)
                     logger.success("Granular thresholds are as follows: %s" % list(set(list(self.granular_lockout_threshold.values()))))
-                    logger.info("Printing table of users and their granular thresholds (in case of multiple PSOs, lowest threshold is kept)")
+                    logger.info("Printing table of users and their granular thresholds (in case of multiple PSOs, lowest threshold is kept) (empty table == no granular policies exist)")
                     for user_dn in self.users.keys():
                         if self.users[user_dn]["lockoutThreshold"] != self.global_lockout_threshold:
                             self.table.add_row(self.options.auth_domain, self.users[user_dn]["sAMAccountName"], str(self.users[user_dn]["lockoutThreshold"]))
@@ -984,8 +984,17 @@ class bruteforce(object):
                 logger.success("Successfully logged in, fetching domain information")
                 if self.options.enum_users:
                     self.get_users(ldap_connection=ldap_connection, domain=self.options.auth_domain)
+                    for user_dn in self.users.keys():
+                        self.table.add_row(self.options.auth_domain, self.users[user_dn]["sAMAccountName"])
                 elif self.options.enum_policy:
                     self.get_lockout_thresholds(ldap_connection=ldap_connection, domain=self.options.auth_domain)
+                    self.get_users(ldap_connection=ldap_connection, domain=self.options.auth_domain)
+                    logger.success("Global lockout threshold is: %d" % self.global_lockout_threshold)
+                    logger.success("Granular thresholds are as follows: %s" % list(set(list(self.granular_lockout_threshold.values()))))
+                    logger.info("Printing table of users and their granular thresholds (in case of multiple PSOs, lowest threshold is kept) (empty table == no granular policies exist)")
+                    for user_dn in self.users.keys():
+                        if self.users[user_dn]["lockoutThreshold"] != self.global_lockout_threshold:
+                            self.table.add_row(self.options.auth_domain, self.users[user_dn]["sAMAccountName"], str(self.users[user_dn]["lockoutThreshold"]))
                 else:
                     self.get_lockout_thresholds(ldap_connection=ldap_connection, domain=self.options.auth_domain)
                     self.get_users(ldap_connection=ldap_connection, domain=self.options.auth_domain)
