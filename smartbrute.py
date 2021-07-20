@@ -455,7 +455,7 @@ class KERBEROS(object):
         userName = Principal(user, type=constants.PrincipalNameType.NT_PRINCIPAL.value)
         if TGT is None:
             if TGS is None:
-                tgt, cipher, oldSessionKey, sessionKey = getKerberosTGT(clientName=userName, password=password, domain=domain, lmhash=None, nthash=rc4_key, aesKey=aes_key)
+                tgt, cipher, oldSessionKey, sessionKey = getKerberosTGT(clientName=userName, password=password, domain=domain, lmhash=None, nthash=rc4_key, aesKey=aes_key, kdcHost=kdc_ip)
         else:
             tgt = TGT["KDC_REP"]
             cipher = TGT["cipher"]
@@ -463,7 +463,7 @@ class KERBEROS(object):
 
         if TGS is None:
             serverName = Principal("ldap/%s" % target, type=constants.PrincipalNameType.NT_SRV_INST.value)
-            tgs, cipher, oldSessionKey, sessionKey = getKerberosTGS(serverName=serverName, kdcHost=target, domain=domain, tgt=tgt, cipher=cipher, sessionKey=sessionKey)
+            tgs, cipher, oldSessionKey, sessionKey = getKerberosTGS(serverName=serverName, kdcHost=kdc_ip, domain=domain, tgt=tgt, cipher=cipher, sessionKey=sessionKey)
         else:
             tgs = TGS["KDC_REP"]
             cipher = TGS["cipher"]
@@ -513,12 +513,10 @@ class KERBEROS(object):
 
         blob["MechToken"] = encoder.encode(apReq)
 
-
         if tls_version is not None:
-            ldap_connection = ldap.LDAPConnection("ldaps://%s" % target)
+            ldap_connection = ldap.LDAPConnection("ldaps://%s" % target, dstIp=kdc_ip)
         else:
-            ldap_connection = ldap.LDAPConnection("ldap://%s" % target)
-
+            ldap_connection = ldap.LDAPConnection("ldap://%s" % target, dstIp=kdc_ip)
 
         bindRequest = ldapasn1.BindRequest()
         bindRequest["version"] = 3
@@ -994,7 +992,10 @@ class bruteforce(object):
                     self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.auth_domain)
                     self.domain_is_dumped = True
                     logger.success("Domain enumeration is over, starting attack")
+                    k, maxi = 1, len(self.users.keys())
                     for user_dn in self.users.keys():
+                        self.table.caption = "  [yellow3]User[/]: %d/%d (%3.1f%%) (%s)" % (k, maxi, round(k / maxi * 100, 1), self.users[user_dn]["sAMAccountName"])
+                        k += 1
                         self.smart_try_user(user_dn)
             else:
                 logger.error("Error connecting, username/password might be invalid...")
@@ -1634,7 +1635,7 @@ def get_options():
     kerberos_secrets = kerberos_auth.add_mutually_exclusive_group()
     kerberos_secrets.add_argument("-t", "--ccache-ticket", dest="auth_ccache_ticket", action="store", metavar="/path/to/ticket.ccache", help="path to a .ccache file (kerberos ticket)")
     kerberos_credentials = kerberos_secrets.add_argument_group("credentials to use")
-    kerberos_credentials.add_argument("-d", "--domain", dest="auth_domain", metavar="DOMAIN", action="store", help="domain to authenticate to")
+    kerberos_credentials.add_argument("-d", "--domain", dest="auth_domain", metavar="DOMAIN", action="store", help="(FQDN) domain to authenticate to")
     kerberos_credentials.add_argument("-u", "--user", dest="auth_user", metavar="USER", action="store", help="user to authenticate with")
     kerberos_secret = kerberos_credentials.add_mutually_exclusive_group()
     kerberos_secret.add_argument("-p", "--password", dest="auth_password", metavar="PASSWORD", action="store", help="password to authenticate with")
@@ -1683,6 +1684,11 @@ def get_options():
 
     if options.running_mode == "smart" and options.auth_protocol == "kerberos" and options.auth_ccache_ticket is None and (options.auth_domain is None or options.auth_user is None or (options.auth_password is None and options.auth_aes_key is None and options.auth_rc4_key is None)):
         print("error: either set -t/--ccache-ticket or (-d/--domain with -u/--user with (-p/--password or -H/--hash or -k/--aes-key))")
+        kerberos_parser.print_help()
+        exit(0)
+
+    if options.running_mode == "smart" and options.auth_protocol == "kerberos" and options.auth_domain is not None and "." not in options.auth_domain:
+        print("error: FQDN domain is needed")
         kerberos_parser.print_help()
         exit(0)
 
