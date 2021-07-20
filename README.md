@@ -4,7 +4,7 @@
 
 The smart password spraying and bruteforcing tool for Active Directory Domain Services.
 
-**This project is actually in an alpha state. It has not been tested in many real life environments for now. Expect the unexpected...**
+**:warning: This project is actually in an alpha state. It has not been tested in many real life environments for now. Expect the unexpected...**
 
 ## Core features
 
