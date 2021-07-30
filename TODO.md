@@ -1,4 +1,4 @@
 - improve ldap results based on code from function `get_attributes_from_object_dn`
 - wiki/documentation/readme/GIFs
 - add `-o/--output-file` argument to save important findings in files
-- caption update only if -q not set
+- add sprayhound dynamically in requirements and in code now that it's on pypi https://pypi.org/project/sprayhound/ 

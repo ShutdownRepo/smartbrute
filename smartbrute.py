@@ -277,7 +277,7 @@ class KERBEROS(object):
             cipher = _enctype_table[enc_type]
 
             # Pass the hash/aes key :P
-            if rc4_key != b"" and (isinstance(rc4_key, bytes) and rc4_key != b""):
+            if rc4_key != b"" and isinstance(rc4_key, bytes):
                 key = Key(cipher.enctype, rc4_key)
             else:
                 if etype == "rc4":
