@@ -753,8 +753,8 @@ class bruteforce(object):
             domain_dn = ",".join(["DC=" + part for part in domain.split(".")])
 
         # any user that is not disabled
-        # search_filters = "(&(objectCategory=User)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
-        search_filters = "(objectCategory=User)"
+        search_filters = "(&(objectCategory=User)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+        # search_filters = "(objectCategory=User)"
         # we want username and attempts left for each account
         attributes = ["samAccountName", "badPwdCount", "distinguishedName"]
 
