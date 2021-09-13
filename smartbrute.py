@@ -718,8 +718,11 @@ class bruteforce(object):
             if self.special_groups[group_dn]["group_type"] == "admin":
                 for user_dn in self.members_dn_from_group_dn(ldap_connection=ldap_connection, object_dn=group_dn):
                     # group = self.special_groups[group_dn]["sAMAccountName"]
-                    user = self.get_attributes_from_object_dn(ldap_connection=ldap_connection, object_dn=user_dn, attributes=["sAMAccountName"])["sAMAccountName"].decode("utf-8")
-                    admin_users.append(user)
+                    try:
+                        user = self.get_attributes_from_object_dn(ldap_connection=ldap_connection, object_dn=user_dn, attributes=["sAMAccountName"])["sAMAccountName"].decode("utf-8")
+                        admin_users.append(user)
+                    except:
+                        logger.debug("Met some kind of error while trying to get attrs from object dn %s" % user_dn)
             elif self.special_groups[group_dn]["group_type"] == "special":
                 for user_dn in self.members_dn_from_group_dn(ldap_connection=ldap_connection, object_dn=group_dn):
                     user = self.get_attributes_from_object_dn(ldap_connection=ldap_connection, object_dn=user_dn, attributes=["sAMAccountName"])["sAMAccountName"].decode("utf-8")
