@@ -924,6 +924,8 @@ class bruteforce(object):
                 self.table.add_row(domain, user, secret, " ".join(printed_details), style=style)
 
     def smart_attack(self):
+        logger.info("Bad password counts dont replicate between domain controllers. Only the PDC knows the real amount of those. Be sure to target the PDC so that accounts don't get locked out")
+        # https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc775412(v=ws.10)?redirectedfrom=MSDN
         if self.options.auth_protocol == "ntlm":
             logger.verbose("Fetching domain information through NTLM over LDAP")
             # if self.options.auth_domain is None or "." not in self.options.auth_domain:
