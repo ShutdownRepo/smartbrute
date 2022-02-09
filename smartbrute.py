@@ -802,7 +802,7 @@ class bruteforce(object):
                 results = e.getAnswers()
         for policy in results:
             if isinstance(policy, ldapasn1.SearchResultEntry):
-                if str(policy[1][1][0]) == "msDS-PSOAppliesTo":
+                if policy[1][1].hasValue() and str(policy[1][1][0]) == "msDS-PSOAppliesTo":
                     for element in policy[1][1][1]:
                         applies_to_dn = element.asOctets().decode("utf-8")
                         # applies_to_dn = policy[1][1][1][0].asOctets().decode("utf-8")
@@ -827,6 +827,9 @@ class bruteforce(object):
                             logger.error("Something went wrong when parsing policies information...")
                             exit(0)
                 else:
+                    if not policy[1][1].hasValue():
+                        logger.debug("The policy %s wasn't assigned to any group" % policy[0])
+                        continue
                     logger.error("Something went wrong when parsing policies information...")
                     exit(0)
         logger.verbose("Found global lockout threshold (%d) and granular lockout thresholds (%s)" % (self.global_lockout_threshold, list(set(list(self.granular_lockout_threshold.values())))))
