@@ -4,7 +4,7 @@
 
 The smart password spraying and bruteforcing tool for Active Directory Domain Services.
 
-**:warning: This project is actually in an alpha state. It has not been tested in many real life environments for now. Expect the unexpected...**
+**:warning: This project works. But the filthy coding makes it more PoC than a stable tool. I may or may not rewrite this in the future, but at least you have everything here to work with bruteforce on any protocol. It has been tested in ~10 environments on my side, it works 🤷‍♂️**
 
 ## Core features
 
