@@ -1711,7 +1711,7 @@ def get_options():
         exit(0)
 
     if options.bruteforced_protocol == "kerberos":
-        if options.bf_hash is not None or options.bf_hashes_file is not None and options.etype != "rc4":
+        if (options.bf_hash is not None or options.bf_hashes_file is not None) and options.etype != "rc4":
             print("error: -e/--etype was set to aes128 or aes256 but a RC4 key (or set of) was supplied with -bh/-bH, this doesn't make sense. Resuming the bruteforce with RC4 etype.")
             kerberos_parser.print_help()
             exit(0)
