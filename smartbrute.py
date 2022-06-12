@@ -1325,7 +1325,15 @@ class bruteforce(object):
                     auth, details = self.kerberos.pre_authentication(target=target, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, etype=self.options.etype, tproto=self.options.transport_protocol)
                     if auth and not self.domain_is_dumped and not self.options.no_enumeration:
                         logger.verbose("First successful auth! Starting domain dump to find privileged users")
-                        ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=None, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None)
+                        
+                        if self.options.auth_use_ldaps == True:
+                            try:
+                                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=ssl.PROTOCOL_TLSv1_2, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None)
+                            except:
+                                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None)
+                        else:
+                            ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=None, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None)
+
                         if ldap_connection:
                             self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.domain)
                             self.domain_is_dumped = True
@@ -1600,6 +1608,7 @@ def get_options():
     bruteforce_mode_kerberos_mode.add_argument("-d", "--domain", dest="domain", action="store", required=True, help="domain to authenticate to")
     bruteforce_mode_kerberos_mode.add_argument("-p", "--transport-protocol", dest="transport_protocol", choices=["udp", "tcp"], default="udp", action="store", help="transport protocol to use (default: udp)")
     bruteforce_mode_kerberos_mode.add_argument("-e", "--etype", dest="etype", action="store", choices=["rc4", "aes128", "aes256"], default="rc4", help="etype to use (default: rc4)")
+    bruteforce_mode_kerberos_mode.add_argument("--use-ldaps", dest="auth_use_ldaps", action="store_true", help="Use LDAPS instead of LDAP to query domain information (default: False)")
 
     # adding NTLM and Kerberos bruteforcing modes subparsers to the bruteforce mode
     bruteforce_mode_protocols_subparser = bruteforce_mode.add_subparsers(help="this tells what authentication protocol smartbrute has to use when bruteforcing. When choosing kerberos, smartbrute will operate a pre-authentication bruteforce", dest="bruteforced_protocol")
