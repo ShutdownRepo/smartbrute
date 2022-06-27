@@ -381,7 +381,7 @@ class KERBEROS(object):
                 return False, ""
 
 
-    def LDAP_authentication(self, kdc_ip, tls_version, domain, user, password, rc4_key, aes_key, ccache_ticket):
+    def LDAP_authentication(self, kdc_ip, tls_version, domain, user, password, rc4_key, aes_key, ccache_ticket, dc_host):
         # todo : check LDAP or LDAPS is open before connecting, if port is closed, ask the user if he's sure he's testing a domain controller
 
         if user is None:
@@ -422,7 +422,10 @@ class KERBEROS(object):
                     domain = ccache.principal.realm["data"].decode("utf-8")
                     logger.debug("Domain retrieved from CCache: %s" % domain)
 
-                target = self.get_machine_name(kdc_ip, domain)
+                if not dc_host:
+                    target = self.get_machine_name(kdc_ip, domain)
+                else:
+                    target = dc_host
 
                 logger.debug("Using Kerberos Cache: %s" % ccache_ticket)
                 principal = "ldap/%s@%s" % (target.upper(), domain.upper())
@@ -449,7 +452,10 @@ class KERBEROS(object):
                     user = ccache.principal.components[0]["data"].decode("utf-8")
                     logger.debug("Username retrieved from CCache: %s" % user)
         else:
-            target = self.get_machine_name(kdc_ip, domain)
+            if not dc_host:
+                target = self.get_machine_name(kdc_ip, domain)
+            else:
+                target = dc_host
 
         # First of all, we need to get a TGT for the user
         userName = Principal(user, type=constants.PrincipalNameType.NT_PRINCIPAL.value)
@@ -999,11 +1005,11 @@ class bruteforce(object):
                 target = self.options.auth_domain
             if self.options.auth_use_ldaps:
                 try:
-                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1_2, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket)
+                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1_2, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, dc_host=self.options.dc_host)
                 except ldap3.core.exceptions.LDAPSocketOpenError:
-                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket)
+                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, dc_host=self.options.dc_host)
             else:
-                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=None, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket)
+                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=None, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, dc_host=self.options.dc_host)
             if ldap_connection:
                 logger.success("Successfully logged in, fetching domain information")
                 if self.options.enum_users:
@@ -1379,11 +1385,11 @@ class bruteforce(object):
                         
                         if self.options.auth_use_ldaps:
                             try:
-                                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=ssl.PROTOCOL_TLSv1_2, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None)
+                                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=ssl.PROTOCOL_TLSv1_2, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None, dc_host=self.options.dc_host)
                             except:
-                                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None)
+                                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None, dc_host=self.options.dc_host)
                         else:
-                            ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=None, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None)
+                            ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=None, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None, dc_host=self.options.dc_host)
 
                         if ldap_connection:
                             self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.domain)
@@ -1661,6 +1667,7 @@ def get_options():
     bruteforce_mode_kerberos_mode.add_argument("-p", "--transport-protocol", dest="transport_protocol", choices=["udp", "tcp"], default="udp", action="store", help="transport protocol to use (default: udp)")
     bruteforce_mode_kerberos_mode.add_argument("-e", "--etype", dest="etype", action="store", choices=["rc4", "aes128", "aes256"], default="rc4", help="etype to use (default: rc4)")
     bruteforce_mode_kerberos_mode.add_argument("--use-ldaps", dest="auth_use_ldaps", action="store_true", help="Use LDAPS instead of LDAP to query domain information (default: False)")
+    bruteforce_mode_kerberos_mode.add_argument('--dc-host', action='store', help='Hostname of the target, can be used if port 445 is blocked or if NTLM is disabled')
 
     # adding NTLM and Kerberos bruteforcing modes subparsers to the bruteforce mode
     bruteforce_mode_protocols_subparser = bruteforce_mode.add_subparsers(help="this tells what authentication protocol smartbrute has to use when bruteforcing. When choosing kerberos, smartbrute will operate a pre-authentication bruteforce", dest="bruteforced_protocol")
@@ -1695,6 +1702,7 @@ def get_options():
     # smart_mode_kerberos_mode.add_argument("-d", "--domain", dest="domain", action="store", help="domain to authenticate to")
     smart_mode_kerberos_mode.add_argument("-e", "--etype", dest="etype", action="store", choices=["rc4", "aes128", "aes256"], default="rc4", help="etype to use (default: rc4)")
     smart_mode_kerberos_mode.add_argument("--use-ldaps", dest="auth_use_ldaps", action="store_true", help="Use LDAPS instead of LDAP to query domain information (default: False)")
+    smart_mode_kerberos_mode.add_argument('--dc-host', action='store', help='Hostname of the target, can be used if port 445 is blocked or if NTLM is disabled')
 
     # defining the smart mode NTLM authentication arguments
     ntlm_auth = argparse.ArgumentParser(add_help=False)
