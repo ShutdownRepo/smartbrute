@@ -997,7 +997,11 @@ class bruteforce(object):
                 except ldap3.core.exceptions.LDAPSocketOpenError:
                     ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, kdc_host=self.options.kdc_host)
             else:
-                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=None, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, kdc_host=self.options.kdc_host)
+                try:
+                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=None, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, kdc_host=self.options.kdc_host)
+                except ldap.LDAPSessionError as e:
+                    if "strongerAuthRequired" in str(e) or "TLS" in str(e):
+                        raise Exception("LDAP authentication failed:\n%s.\nTry using the --use-ldaps option." % str(e))
             if ldap_connection:
                 logger.success("Successfully logged in, fetching domain information")
                 if self.options.enum_users:
