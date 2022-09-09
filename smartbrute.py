@@ -78,12 +78,20 @@ class KERBEROS(object):
 
 
     def get_machine_name(self, kdc_ip, domain):
+        logger.debug("Getting machine name.")
         if kdc_ip is not None:
             s = SMBConnection(kdc_ip, kdc_ip)
         else:
             s = SMBConnection(domain, domain)
         try:
             s.login("", "")
+        except SessionError as e:
+            if str(e).find('STATUS_NOT_SUPPORTED') > 0:
+                raise Exception('Machine name lookup via SMB anonymous login is not supported. '
+                                'Probably NTLM is disabled. '
+                                'Try to specify corresponding NetBIOS name or FQDN via the --dc-host option')
+            else:
+                raise
         except Exception:
             if s.getServerName() == "":
                 raise Exception("Error while anonymous logging into %s" % domain)
@@ -381,7 +389,7 @@ class KERBEROS(object):
                 return False, ""
 
 
-    def LDAP_authentication(self, kdc_ip, tls_version, domain, user, password, rc4_key, aes_key, ccache_ticket):
+    def LDAP_authentication(self, kdc_ip, tls_version, domain, user, password, rc4_key, aes_key, ccache_ticket, kdc_host=None):
         # todo : check LDAP or LDAPS is open before connecting, if port is closed, ask the user if he's sure he's testing a domain controller
 
         if user is None:
@@ -422,7 +430,7 @@ class KERBEROS(object):
                     domain = ccache.principal.realm["data"].decode("utf-8")
                     logger.debug("Domain retrieved from CCache: %s" % domain)
 
-                target = self.get_machine_name(kdc_ip, domain)
+                target = kdc_host if kdc_host is not None else self.get_machine_name(kdc_ip, domain)
 
                 logger.debug("Using Kerberos Cache: %s" % ccache_ticket)
                 principal = "ldap/%s@%s" % (target.upper(), domain.upper())
@@ -449,8 +457,9 @@ class KERBEROS(object):
                     user = ccache.principal.components[0]["data"].decode("utf-8")
                     logger.debug("Username retrieved from CCache: %s" % user)
         else:
-            target = self.get_machine_name(kdc_ip, domain)
+            target = kdc_host if kdc_host is not None else self.get_machine_name(kdc_ip, domain)
 
+        logger.debug("Using target %s." % target)
         # First of all, we need to get a TGT for the user
         userName = Principal(user, type=constants.PrincipalNameType.NT_PRINCIPAL.value)
         if TGT is None:
@@ -984,11 +993,11 @@ class bruteforce(object):
                 target = self.options.auth_domain
             if self.options.auth_use_ldaps == True:
                 try:
-                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1_2, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket)
+                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1_2, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, kdc_host=self.options.kdc_host)
                 except ldap3.core.exceptions.LDAPSocketOpenError:
-                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket)
+                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, kdc_host=self.options.kdc_host)
             else:
-                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=None, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket)
+                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=None, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, kdc_host=self.options.kdc_host)
             if ldap_connection:
                 logger.success("Successfully logged in, fetching domain information")
                 if self.options.enum_users:
@@ -1325,7 +1334,7 @@ class bruteforce(object):
                     auth, details = self.kerberos.pre_authentication(target=target, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, etype=self.options.etype, tproto=self.options.transport_protocol)
                     if auth and not self.domain_is_dumped and not self.options.no_enumeration:
                         logger.verbose("First successful auth! Starting domain dump to find privileged users")
-                        ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=None, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None)
+                        ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=None, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None, kdc_host=self.options.kdc_host)
                         if ldap_connection:
                             self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.domain)
                             self.domain_is_dumped = True
@@ -1649,6 +1658,8 @@ def get_options():
     # defining the smart mode Kerberos authentication arguments
     kerberos_auth = argparse.ArgumentParser(add_help=False)
     kerberos_auth.add_argument("--kdc-ip", dest="auth_kdc_ip", metavar="KDC_IP", action="store", help="key distribution center to obtain tickets from")
+    kerberos_auth.add_argument("--kdc-host", dest="kdc_host", action="store",
+                               help="Hostname of the key distribution center (specify this to prevent machine name lookup using anonymous SMB)")
     kerberos_auth.add_argument("--use-ldaps", dest="auth_use_ldaps", action="store_true", help="Use LDAPS instead of LDAP to query domain information (default: False)")
     kerberos_secrets = kerberos_auth.add_mutually_exclusive_group()
     kerberos_secrets.add_argument("-t", "--ccache-ticket", dest="auth_ccache_ticket", action="store", metavar="/path/to/ticket.ccache", help="path to a .ccache file (kerberos ticket)")
