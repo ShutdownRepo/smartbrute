@@ -924,12 +924,12 @@ class bruteforce(object):
             elif user in self.special_users:
                 printed_details.append("[bold blue]special account[/bold blue]")
             if details == "KRB_ERR_RESPONSE_TOO_BIG":
-                logger.verbose("Raised KRB_ERR_RESPONSE_TOO_BIG for domain (%s), user (%s) and password (%s), auth is prbbly ok, set --transport-protocol to tcp to make sure of it" % (self.options.domain, user, password))
+                logger.verbose("Raised KRB_ERR_RESPONSE_TOO_BIG for domain (%s), user (%s) and password (%s), auth is prbbly ok, set --transport-protocol to tcp to make sure of it" % (domain, user, password))
                 printed_details.append("[yellow3](probably valid)[/yellow3]")
                 style = "green"
                 self.table.add_row(domain, user, secret, " ".join(printed_details), style=style)
             if details == "KRB_AP_ERR_SKEW":
-                logger.verbose("Raised KRB_AP_ERR_SKEW for domain (%s), user (%s) and password (%s), auth is prbbly ok, but there is a time skew between the machines" % (self.options.domain, user, password))
+                logger.verbose("Raised KRB_AP_ERR_SKEW for domain (%s), user (%s) and password (%s), auth is prbbly ok, but there is a time skew between the machines" % (domain, user, password))
                 logger.verbose("Server time is %s (UTC)" % self.kerberos.server_time)
                 printed_details.append("[yellow3](probably valid)[/yellow3]")
                 style = "green"
