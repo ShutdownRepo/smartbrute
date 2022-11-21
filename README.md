@@ -1,4 +1,4 @@
-<!--![](./assets/smartbrute.png)-->
+<!--![](./.assets/smartbrute.png)-->
 
 ## Description
 
@@ -45,7 +45,7 @@ When valid credentials are found, if the account is part of those members, it wi
 
 In smart mode, bruteforce can also be skipped to only show fetched users or password policies.
 
-![](./assets/example_smart.gif)
+![](./.assets/example_smart.gif)
     
 ### Brute mode
 
@@ -55,16 +55,16 @@ In this mode, a username (or list of usernames) has to be supplied.
 - On the first successful bruteforced authentication, the tool will recursively fetch (using LDAP) the members of special groups (Administrators, Domain Admins, Entreprise Key Admins, and many more). When valid credentials are found, if the account is part of those members, it will be highlighted.
 - Bruteforce can be stopped when a valid account is found 
 
-![](./assets/example_brute.gif)
+![](./.assets/example_brute.gif)
 
 ## Usage
 
 This tool is designed to give its users the most control over what is happening. This leads to a complex (not complicated, there's a difference) usage.
 This tool is built around multiple subparsers allocated in the following manner (cf. following graph and picture).
 
-![](./assets/cmd_help.png)
-![](assets/graph_help.png)
-![](./assets/usage.png)
+![](./.assets/cmd_help.png)
+![](./.assets/graph_help.png)
+![](./.assets/usage.png)
 
 ## Contributing
 
@@ -86,9 +86,9 @@ We thank all contributors behind those projects.
 And now, here is a collection of memes that perfectly frames this tool's spirit (feel free to contribute) 
 
 <p align="center">
-  <img src="./memes/001.png">
-  <img src="./memes/002.png">
-  <img src="./memes/003.png">
-  <img src="./memes/004.png">
-  <img src="./memes/005.png">
+  <img src="./.memes/001.png">
+  <img src="./.memes/002.png">
+  <img src="./.memes/003.png">
+  <img src="./.memes/004.png">
+  <img src="./.memes/005.png">
 </p>
