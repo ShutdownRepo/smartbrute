@@ -381,7 +381,7 @@ class KERBEROS(object):
                 return False, ""
 
 
-    def LDAP_authentication(self, kdc_ip, tls_version, domain, user, password, rc4_key, aes_key, ccache_ticket):
+    def LDAP_authentication(self, kdc_ip, tls_version, domain, user, password, rc4_key, aes_key, ccache_ticket, dc_host):
         # todo : check LDAP or LDAPS is open before connecting, if port is closed, ask the user if he's sure he's testing a domain controller
 
         if user is None:
@@ -422,7 +422,10 @@ class KERBEROS(object):
                     domain = ccache.principal.realm["data"].decode("utf-8")
                     logger.debug("Domain retrieved from CCache: %s" % domain)
 
-                target = self.get_machine_name(kdc_ip, domain)
+                if not dc_host:
+                    target = self.get_machine_name(kdc_ip, domain)
+                else:
+                    target = dc_host
 
                 logger.debug("Using Kerberos Cache: %s" % ccache_ticket)
                 principal = "ldap/%s@%s" % (target.upper(), domain.upper())
@@ -449,7 +452,10 @@ class KERBEROS(object):
                     user = ccache.principal.components[0]["data"].decode("utf-8")
                     logger.debug("Username retrieved from CCache: %s" % user)
         else:
-            target = self.get_machine_name(kdc_ip, domain)
+            if not dc_host:
+                target = self.get_machine_name(kdc_ip, domain)
+            else:
+                target = dc_host
 
         # First of all, we need to get a TGT for the user
         userName = Principal(user, type=constants.PrincipalNameType.NT_PRINCIPAL.value)
@@ -596,15 +602,21 @@ class NTLM(object):
                 return False, ""
 
 
-    def LDAP_authentication(self, target, domain, user, password, lm_hash, nt_hash):
+    def LDAP_authentication(self, tls_version, target, domain, user, password, lm_hash, nt_hash):
         # todo : check LDAP or LDAPS is open before connecting, if port is closed, ask the user if he's sure he's testing a domain controller
         if nt_hash is None:
             nt_hash = ""
         if lm_hash is None:
             lm_hash = ""
+        
         try:
-            logger.debug("Connecting to ldap://%s" % target)
-            ldap_connection = ldap.LDAPConnection(url="ldap://%s" % target)
+            if tls_version is not None:
+                logger.debug("Connecting to ldaps://%s" % target)
+                ldap_connection = ldap.LDAPConnection(url="ldaps://%s" % target)
+            else:
+                logger.debug("Connecting to ldap://%s" % target)
+                ldap_connection = ldap.LDAPConnection(url="ldap://%s" % target)
+            
             logger.debug("Logging in with domain, user, password, lm_hash, nt_hash (%s, %s, %s, %s, %s)" % (domain, user, password, lm_hash, nt_hash))
             ldap_connection.login(domain=domain, user=user, password=password, lmhash=lm_hash, nthash=nt_hash)
             return ldap_connection
@@ -947,7 +959,16 @@ class bruteforce(object):
                     auth_nt_hash = self.options.auth_hashes.split(":")[1]
                 else:
                     auth_nt_hash = self.options.auth_hashes
-            ldap_connection = self.ntlm.LDAP_authentication(target=target, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, lm_hash=auth_lm_hash, nt_hash=auth_nt_hash)
+            
+            # Handling LDAPS
+            if self.options.auth_use_ldaps:
+                try:
+                    ldap_connection = self.ntlm.LDAP_authentication(target=target, tls_version=ssl.PROTOCOL_TLSv1_2, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, lm_hash=auth_lm_hash, nt_hash=auth_nt_hash)
+                except:
+                    ldap_connection = self.ntlm.LDAP_authentication(target=target, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, lm_hash=auth_lm_hash, nt_hash=auth_nt_hash)
+            else:
+                ldap_connection = self.ntlm.LDAP_authentication(target=target, tls_version=None, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, lm_hash=auth_lm_hash, nt_hash=auth_nt_hash)
+            
             if ldap_connection:
                 logger.success("Successfully logged in, fetching domain information")
                 if self.options.enum_users:
@@ -982,13 +1003,13 @@ class bruteforce(object):
                 target = self.options.auth_kdc_ip
             else:
                 target = self.options.auth_domain
-            if self.options.auth_use_ldaps == True:
+            if self.options.auth_use_ldaps:
                 try:
-                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1_2, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket)
+                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1_2, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, dc_host=self.options.dc_host)
                 except ldap3.core.exceptions.LDAPSocketOpenError:
-                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket)
+                    ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, dc_host=self.options.dc_host)
             else:
-                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=None, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket)
+                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=self.options.auth_kdc_ip, tls_version=None, domain=self.options.auth_domain, user=self.options.auth_user, password=self.options.auth_password, rc4_key=self.options.auth_rc4_key, aes_key=self.options.auth_aes_key, ccache_ticket=self.options.auth_ccache_ticket, dc_host=self.options.dc_host)
             if ldap_connection:
                 logger.success("Successfully logged in, fetching domain information")
                 if self.options.enum_users:
@@ -1096,7 +1117,16 @@ class bruteforce(object):
                 if self.options.application_protocol == "smb":
                     auth, details = self.ntlm.SMB_authentication(target=target, domain=domain, user=user, password=password, nt_hash=password_hash)
                 elif self.options.application_protocol == "ldap":
-                    auth = self.ntlm.LDAP_authentication(target=target, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+
+                    # Handling LDAPS
+                    if self.options.auth_use_ldaps:
+                        try:
+                            auth = self.ntlm.LDAP_authentication(target=target, tls_version=ssl.PROTOCOL_TLSv1_2, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+                        except:
+                            auth = self.ntlm.LDAP_authentication(target=target, tls_version=ssl.PROTOCOL_TLSv1, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+                    else:
+                        auth = self.ntlm.LDAP_authentication(target=target, tls_version=None, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+            
                     # LDAP authentication doesn't throw errors indicating is the user is disabled or something...
                     details = ""
                 self.handle_auth_results(domain=domain, user=user, user_dn=user_dn, password=password, password_hash=password_hash, auth=auth, details=details)
@@ -1289,7 +1319,16 @@ class bruteforce(object):
                         logger.verbose("No domain supplied, skipping domain dump despite valid authentication")
                     else:
                         logger.verbose("First successful auth! Starting domain dump to find privileged users")
-                        ldap_connection = self.ntlm.LDAP_authentication(target=target, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+                                                
+                        # Handling LDAPS
+                        if self.options.auth_use_ldaps:
+                            try:
+                                ldap_connection = self.ntlm.LDAP_authentication(target=target, tls_version=ssl.PROTOCOL_TLSv1_2, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+                            except:
+                                ldap_connection = self.ntlm.LDAP_authentication(target=target, tls_version=ssl.PROTOCOL_TLSv1, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+                        else:
+                            ldap_connection = self.ntlm.LDAP_authentication(target=target, tls_version=None, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+            
                         if ldap_connection:
                             self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.domain)
                             self.domain_is_dumped = True
@@ -1297,7 +1336,16 @@ class bruteforce(object):
                 self.handle_auth_results(domain=domain, user=user, user_dn=None, password=password, password_hash=password_hash, auth=auth, details=details)
                 return auth
             elif self.options.application_protocol == "ldap":
-                auth = self.ntlm.LDAP_authentication(target=target, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+
+                # Handling LDAPS
+                if self.options.auth_use_ldaps:
+                    try:
+                        auth = self.ntlm.LDAP_authentication(target=target, tls_version=ssl.PROTOCOL_TLSv1_2, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+                    except:
+                        auth = self.ntlm.LDAP_authentication(target=target, tls_version=ssl.PROTOCOL_TLSv1, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+                else:
+                    auth = self.ntlm.LDAP_authentication(target=target, tls_version=None, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+
                 # LDAP authentication doesn't throw errors indicating is the user is disabled or something...
                 details = ""
                 if auth and not self.domain_is_dumped and not self.options.no_enumeration:
@@ -1305,7 +1353,16 @@ class bruteforce(object):
                         logger.verbose("No domain supplied, skipping domain dump despite valid authentication")
                     else:
                         logger.verbose("First successful auth! Starting domain dump to find privileged users")
-                        ldap_connection = self.ntlm.LDAP_authentication(target=target, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+                        
+                        # Handling LDAPS
+                        if self.options.auth_use_ldaps:
+                            try:
+                                ldap_connection = self.ntlm.LDAP_authentication(target=target, tls_version=ssl.PROTOCOL_TLSv1_2, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+                            except:
+                                ldap_connection = self.ntlm.LDAP_authentication(target=target, tls_version=ssl.PROTOCOL_TLSv1, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+                        else:
+                            ldap_connection = self.ntlm.LDAP_authentication(target=target, tls_version=None, domain=domain, user=user, password=password, lm_hash=None, nt_hash=password_hash)
+
                         if ldap_connection:
                             self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.domain)
                             self.domain_is_dumped = True
@@ -1325,7 +1382,15 @@ class bruteforce(object):
                     auth, details = self.kerberos.pre_authentication(target=target, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, etype=self.options.etype, tproto=self.options.transport_protocol)
                     if auth and not self.domain_is_dumped and not self.options.no_enumeration:
                         logger.verbose("First successful auth! Starting domain dump to find privileged users")
-                        ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=None, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None)
+                        
+                        if self.options.auth_use_ldaps:
+                            try:
+                                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=ssl.PROTOCOL_TLSv1_2, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None, dc_host=self.options.dc_host)
+                            except:
+                                ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=ssl.PROTOCOL_TLSv1, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None, dc_host=self.options.dc_host)
+                        else:
+                            ldap_connection = self.kerberos.LDAP_authentication(kdc_ip=target, tls_version=None, domain=self.options.domain, user=user, password=password, rc4_key=password_hash, aes_key=None, ccache_ticket=None, dc_host=self.options.dc_host)
+
                         if ldap_connection:
                             self.get_privileged_users(ldap_connection=ldap_connection, domain=self.options.domain)
                             self.domain_is_dumped = True
@@ -1593,6 +1658,7 @@ def get_options():
     bruteforce_mode_ntlm_mode.add_argument("--dc-ip", dest="dc_ip", action="store", help="domain controller to authenticate to (when using -p/--application-protocol=smb, it can be set to something else than a DC)")
     bruteforce_mode_ntlm_mode.add_argument("-d", "--domain", dest="domain", action="store", help="domain to authenticate to")
     bruteforce_mode_ntlm_mode.add_argument("-p", "--application-protocol", choices=["ldap", "smb"], dest="application_protocol", action="store", help="application layer protocol with which NTLM authentication has to be tried (default: smb)", default="smb")
+    bruteforce_mode_ntlm_mode.add_argument("--use-ldaps", dest="auth_use_ldaps", action="store_true", help="Use LDAPS instead of LDAP to query domain information (default: False)")
 
     # defining bruteforce mode using Kerberos
     bruteforce_mode_kerberos_mode = argparse.ArgumentParser(add_help=False)
@@ -1600,6 +1666,8 @@ def get_options():
     bruteforce_mode_kerberos_mode.add_argument("-d", "--domain", dest="domain", action="store", required=True, help="domain to authenticate to")
     bruteforce_mode_kerberos_mode.add_argument("-p", "--transport-protocol", dest="transport_protocol", choices=["udp", "tcp"], default="udp", action="store", help="transport protocol to use (default: udp)")
     bruteforce_mode_kerberos_mode.add_argument("-e", "--etype", dest="etype", action="store", choices=["rc4", "aes128", "aes256"], default="rc4", help="etype to use (default: rc4)")
+    bruteforce_mode_kerberos_mode.add_argument("--use-ldaps", dest="auth_use_ldaps", action="store_true", help="Use LDAPS instead of LDAP to query domain information (default: False)")
+    bruteforce_mode_kerberos_mode.add_argument('--dc-host', action='store', help='Hostname of the target, can be used if port 445 is blocked or if NTLM is disabled')
 
     # adding NTLM and Kerberos bruteforcing modes subparsers to the bruteforce mode
     bruteforce_mode_protocols_subparser = bruteforce_mode.add_subparsers(help="this tells what authentication protocol smartbrute has to use when bruteforcing. When choosing kerberos, smartbrute will operate a pre-authentication bruteforce", dest="bruteforced_protocol")
@@ -1618,19 +1686,23 @@ def get_options():
     smartbruteforced_action.add_argument("-bP", "--bf-passwords-file", dest="bf_passwords_file", action="store", help="passwords file to test")
     smartbruteforced_action.add_argument("-bh", "--bf-hash", dest="bf_hash", action="store", help="NT hash (or RC4 Kerberos key) to test")
     smartbruteforced_action.add_argument("-bH", "--bf-hashes-file", dest="bf_hashes_file", action="store", help="NT hashes (or RC4 Kerberos keys) file to test")
+    smartbruteforced_action.add_argument("--use-ldaps", dest="auth_use_ldaps", action="store_true", help="Use LDAPS instead of LDAP to query domain information (default: False)")
 
     # defining smart mode attacking on the NTLM protocol
     smart_mode_ntlm_mode = argparse.ArgumentParser(add_help=False)
     smart_mode_ntlm_mode.add_argument("--dc-ip", dest="dc_ip", action="store", help="domain controller to authenticate to")
     # smart_mode_ntlm_mode.add_argument("-d", "--domain", dest="domain", action="store", help="domain to authenticate to")
     smart_mode_ntlm_mode.add_argument("-p", "--application-protocol", choices=["ldap", "smb"], dest="application_protocol", action="store", help="application layer protocol with which NTLM authentication has to be tried (default: smb)", default="smb")
-
+    smart_mode_ntlm_mode.add_argument("--use-ldaps", dest="auth_use_ldaps", action="store_true", help="Use LDAPS instead of LDAP to query domain information (default: False)")
+    
     # defining smart mode attacking on the Kerberos protocol
     smart_mode_kerberos_mode = argparse.ArgumentParser(add_help=False)
     smart_mode_kerberos_mode.add_argument("--kdc-ip", dest="kdc_ip", action="store", help="key distribution center to obtain tickets from")
     smart_mode_kerberos_mode.add_argument("-p", "--transport-protocol", dest="transport_protocol", choices=["udp", "tcp"], default="udp", action="store", help="transport protocol to use (default: udp)")
     # smart_mode_kerberos_mode.add_argument("-d", "--domain", dest="domain", action="store", help="domain to authenticate to")
     smart_mode_kerberos_mode.add_argument("-e", "--etype", dest="etype", action="store", choices=["rc4", "aes128", "aes256"], default="rc4", help="etype to use (default: rc4)")
+    smart_mode_kerberos_mode.add_argument("--use-ldaps", dest="auth_use_ldaps", action="store_true", help="Use LDAPS instead of LDAP to query domain information (default: False)")
+    smart_mode_kerberos_mode.add_argument('--dc-host', action='store', help='Hostname of the target, can be used if port 445 is blocked or if NTLM is disabled')
 
     # defining the smart mode NTLM authentication arguments
     ntlm_auth = argparse.ArgumentParser(add_help=False)
