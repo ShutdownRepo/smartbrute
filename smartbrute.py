@@ -1221,6 +1221,7 @@ class bruteforce(object):
                         if success == True and self.options.stop_on_success == True:
                             logger.debug("Stopping on first successful auth")
                             exit(0)
+                        time.sleep(self.options.delay)
             else:
                 logger.error("File (%s) does not exist" % self.options.bf_users_file)
         else:
@@ -1677,7 +1678,7 @@ def get_options():
     # defining the smart mode arguments
     smart_mode = argparse.ArgumentParser(add_help=False)
     smart_mode.add_argument("-t", "--lockout-threshold", dest="lockout_threshold", action="store", type=int, default=3, required=False, help="number of attempts to leave the user (0 could lockout accounts) (default: 3)")
-    smart_mode.add_argument("--delay", dest="delay", action="store", type=float, default=0, help="number of seconds to wait before each attempt (default: 0)")
+    smart_mode.add_argument("--delay", dest="delay", action="store", type=int, default=0, help="number of seconds to wait before each attempt (default: 0)")
     smartbruteforced_action = smart_mode.add_mutually_exclusive_group(required=True)
     smartbruteforced_action.add_argument("--users", dest="enum_users", action="store_true", default=False, help="only show users list")
     smartbruteforced_action.add_argument("--policy", dest="enum_policy", action="store_true", default=False, help="only show accounts and passwords policy")
