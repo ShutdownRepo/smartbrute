@@ -1172,6 +1172,7 @@ class bruteforce(object):
                     logger.error("Mismatch between the number of users (%d) and the number of passwords (%d), can't try line per line, exiting..." % (len(users), len(passwords)))
                     exit(0)
                 else:
+                    maxi = len(users)
                     for i in range(len(users)):
                         self.table.caption = "  [yellow3]User[/]: %d/%d (%3.1f%%) (%s)" % (i, maxi, round(i/maxi*100,1), users[i].rstrip())
                         success = self.bruteforce_try_password_or_hash(user=users[i], password=passwords[i], password_hash=None)
