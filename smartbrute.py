@@ -44,6 +44,9 @@ try:
 except ImportError:
     from neo4j import GraphDatabase
 from neo4j.exceptions import AuthError, ServiceUnavailable
+import warnings
+
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
 
 # sprahound's global vars
 ERROR_SUCCESS                       = (0, "")
